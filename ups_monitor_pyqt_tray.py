@@ -1,10 +1,10 @@
 import sys
 from PyQt5.QtWidgets import (
 	QApplication, QWidget, QLabel, QVBoxLayout, QHBoxLayout,
-	QProgressBar, QSystemTrayIcon, QMenu, QAction
+	QProgressBar, QSystemTrayIcon, QMenu, QAction, QWidgetAction
 )
 from PyQt5.QtCore import QTimer, Qt, QRect
-from PyQt5.QtGui import QFont, QIcon, QPixmap, QColor, QPainter, QBrush, QPalette
+from PyQt5.QtGui import QFont, QIcon, QPixmap, QColor, QPainter, QBrush, QPalette, QCursor
 
 import subprocess
 
@@ -192,8 +192,11 @@ class UPSMonitorApp(QWidget):
 		tray_menu = QMenu()
 
 		show_action = QAction("Show", self)
+		hide_action = QAction("Hide", self)
 		show_action.triggered.connect(self.show_window)
+		hide_action.triggered.connect(self.hide_window)
 		tray_menu.addAction(show_action)
+		tray_menu.addAction(hide_action)
 
 		exit_action = QAction("Exit", self)
 		exit_action.triggered.connect(self.exit_app)
@@ -203,12 +206,16 @@ class UPSMonitorApp(QWidget):
 		self.tray_icon.show()
 
 		# Handle double-click on tray icon to show the window, even if the window is minimized
-		# Handle double-click on tray icon to show the window, even if minimized
 		self.tray_icon.activated.connect(self.on_tray_icon_activated)
 
 	def on_tray_icon_activated(self, reason):
 		if reason == QSystemTrayIcon.DoubleClick:
 			self.show_window()
+			self.show_battery_status()
+			print("Tray icon double clicked")
+		elif reason == QSystemTrayIcon.Click:
+			self.show_battery_status()
+			print("Tray icon clicked")
 
 	def show_window(self):
 		self.showNormal()  # This will restore the window if it's minimized
@@ -282,6 +289,20 @@ class UPSMonitorApp(QWidget):
 		if reason == QSystemTrayIcon.DoubleClick:
 			self.show_window()
 
+	def hide_window(self):
+		"""
+		Hides the main window.
+		"""
+		self.hide()
+		self.tray_icon.showMessage(
+			"UPS Monitor",
+			"Application was minimized to Tray.",
+			QSystemTrayIcon.Information,
+			2000
+		)
+		# Update the tray option menu to show the show option
+		self.tray_icon.setContextMenu(self.tray_menu)
+		
 	def show_window(self):
 		"""
 		Shows the main window and brings it to the front.
@@ -289,6 +310,10 @@ class UPSMonitorApp(QWidget):
 		self.show()
 		self.raise_()
 		self.activateWindow()
+
+		# Update the tray option menu to show the hide option
+		self.tray_icon.setContextMenu(self.tray_menu)
+
 
 	def closeEvent(self, event):
 		"""
@@ -402,6 +427,43 @@ class UPSMonitorApp(QWidget):
 			self.test_result_value.setText("N/A")
 			# Update tray icon to default
 			self.update_tray_icon(0)
+
+	def show_battery_status(self):
+		battery_percentage = self.get_battery_percentage()  # Implement this method to get the current battery percentage
+		
+		# Create a QWidget to hold the battery status bar
+		status_widget = QWidget()
+		layout = QVBoxLayout(status_widget)
+		
+		# Create a vertical progress bar
+		progress_bar = QProgressBar()
+		progress_bar.setOrientation(Qt.Vertical)
+		progress_bar.setRange(0, 100)
+		progress_bar.setValue(battery_percentage)
+		progress_bar.setTextVisible(False)
+		progress_bar.setFixedSize(30, 100)
+		
+		# Create a label for the percentage text
+		percentage_label = QLabel(f"{battery_percentage}%")
+		percentage_label.setAlignment(Qt.AlignCenter)
+		
+		layout.addWidget(progress_bar)
+		layout.addWidget(percentage_label)
+		
+		# Create a QMenu to hold the status widget
+		menu = QMenu()
+		action = QWidgetAction(menu)
+		action.setDefaultWidget(status_widget)
+		menu.addAction(action)
+		
+		# Show the menu at the cursor position
+		cursor_pos = QCursor.pos()
+		menu.exec_(cursor_pos)
+
+	def get_battery_percentage(self):
+		# Implement this method to return the current battery percentage
+		# You may need to use your existing code or add new logic to fetch this information
+		pass
 
 if __name__ == "__main__":
 	app = QApplication(sys.argv)
